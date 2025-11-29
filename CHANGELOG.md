@@ -1,6 +1,12 @@
 ## v0.26
 
+### Breaking Changes
+
 - Remove Python 3.10 support.
+
+### Features
+
+- `ilab model train` and `ilab model convert` now support memory-efficient streaming LoRA merge with `--streaming` flag. This reduces peak memory usage from ~3x model size to approximately one layer at a time, enabling LoRA merging on systems with limited RAM. Use `--chunk-size` to tune the number of layers buffered during merge (default: 10).
 
 ## v0.25
 

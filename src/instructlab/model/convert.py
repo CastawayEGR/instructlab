@@ -44,6 +44,19 @@ logger = logging.getLogger(__name__)
     default=None,
     show_default=True,
 )
+@click.option(
+    "--streaming",
+    is_flag=True,
+    default=False,
+    help="Use memory-efficient streaming merge (recommended for low-RAM systems).",
+)
+@click.option(
+    "--chunk-size",
+    type=int,
+    default=10,
+    show_default=True,
+    help="Number of layers to buffer during streaming merge. Lower values use less memory.",
+)
 @click.pass_context
 @clickext.display_params
 @utils.macos_requirement(echo_func=click.secho, exit_exception=click.exceptions.Exit)
@@ -54,6 +67,8 @@ def convert(
     skip_de_quantize,
     skip_quantize,
     model_name,
+    streaming,
+    chunk_size,
 ):
     """Converts model to GGUF"""
     # pylint: disable=import-outside-toplevel
@@ -63,7 +78,7 @@ def convert(
     # Local
     from ..llamacpp.llamacpp_convert_to_gguf import convert_llama_to_gguf
     from ..train.lora_mlx.convert import convert_between_mlx_and_pytorch
-    from ..train.lora_mlx.fuse import fine_tune
+    from ..train.lora_mlx.fuse import fine_tune, fine_tune_streaming
 
     model_dir = os.path.expandvars(os.path.expanduser(model_dir)).rstrip("/")
 
@@ -80,12 +95,25 @@ def convert(
 
     # this combines adapter with the original model to produce the updated model
     try:
-        fine_tune(
-            model=source_model_dir,
-            save_path=model_dir_fused,
-            adapter_file=adapter_file,
-            de_quantize=not skip_de_quantize,
-        )
+        if streaming:
+            # Use memory-efficient streaming merge
+            click.echo(f"Using streaming merge (chunk_size={chunk_size}) for reduced memory usage...")
+            fine_tune_streaming(
+                model=source_model_dir,
+                save_path=model_dir_fused,
+                adapter_file=adapter_file,
+                de_quantize=not skip_de_quantize,
+                chunk_size=chunk_size,
+            )
+        else:
+            # Original in-memory merge (faster but uses more RAM)
+            click.echo("Using standard in-memory merge...")
+            fine_tune(
+                model=source_model_dir,
+                save_path=model_dir_fused,
+                adapter_file=adapter_file,
+                de_quantize=not skip_de_quantize,
+            )
     except (requests_exceptions.HTTPError, hf_errors.HFValidationError) as e:
         click.secho(
             f"Failed to fine tune: {e}",

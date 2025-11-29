@@ -28,6 +28,8 @@ def simple_train(
     num_epochs,
     device,
     four_bit_quant,
+    streaming: bool = False,
+    chunk_size: int = 10,
 ):
     effective_data_dir: pathlib.Path = Path(
         data_path if data_path else DEFAULTS.DATASETS_DIR
@@ -172,6 +174,8 @@ def simple_train(
             num_epochs=num_epochs,
             train_device=device,
             four_bit_quant=four_bit_quant,
+            streaming=streaming,
+            chunk_size=chunk_size,
         )
 
         final_results_dir = training_results_dir / "final"

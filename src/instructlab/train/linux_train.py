@@ -127,8 +127,25 @@ def linux_train(
     train_device: str = "cpu",
     four_bit_quant: bool = False,
     output_dir: Path = Path("training_results"),
+    streaming: bool = False,
+    chunk_size: int = 10,
 ) -> Path:
-    """Lab Train for Linux!"""
+    """Lab Train for Linux!
+
+    Args:
+        train_file: Path to training data file
+        test_file: Path to test data file
+        model_name: Name/path of the base model
+        num_epochs: Number of training epochs
+        train_device: Device to train on (cpu, cuda)
+        four_bit_quant: Whether to use 4-bit quantization
+        output_dir: Directory to save outputs
+        streaming: Use memory-efficient streaming merge (default False)
+        chunk_size: Number of layers to buffer during streaming merge
+
+    Returns:
+        Path to the output directory
+    """
 
     try:
         device = torch.device(train_device)
@@ -357,8 +374,47 @@ def linux_train(
         print(assistant_expected)
 
     print("LINUX_TRAIN.PY: MERGING ADAPTERS")
-    model = trainer.model.merge_and_unload()
-    model.save_pretrained(output_dir / "merged_model")
+
+    if streaming:
+        # Memory-efficient streaming merge
+        print(f"LINUX_TRAIN.PY: Using streaming merge (chunk_size={chunk_size})")
+
+        # First, save the adapter weights
+        adapter_dir = output_dir / "adapter_checkpoint"
+        adapter_dir.mkdir(parents=True, exist_ok=True)
+        trainer.model.save_pretrained(adapter_dir)
+        print(f"LINUX_TRAIN.PY: Saved adapter to {adapter_dir}")
+
+        # Now use streaming merge
+        # First Party
+        from instructlab.model.merge import stream_merge_lora
+
+        # Get adapter file path
+        adapter_file = adapter_dir / "adapter_model.safetensors"
+        if not adapter_file.exists():
+            # Try bin format
+            adapter_file = adapter_dir / "adapter_model.bin"
+
+        merged_model_dir = output_dir / "merged_model"
+
+        try:
+            stream_merge_lora(
+                base_model_path=Path(model_name),
+                adapter_path=adapter_file,
+                output_path=merged_model_dir,
+                chunk_size=chunk_size,
+            )
+            print(f"LINUX_TRAIN.PY: Streaming merge complete, output at {merged_model_dir}")
+        except Exception as e:
+            print(f"LINUX_TRAIN.PY: Streaming merge failed ({e}), falling back to standard merge")
+            # Fallback to standard merge
+            merged_model = trainer.model.merge_and_unload()
+            merged_model.save_pretrained(merged_model_dir)
+    else:
+        # Standard in-memory merge (original behavior)
+        print("LINUX_TRAIN.PY: Using standard in-memory merge")
+        model = trainer.model.merge_and_unload()
+        model.save_pretrained(output_dir / "merged_model")
 
     print("LINUX_TRAIN.PY: FINISHED")
     return output_dir

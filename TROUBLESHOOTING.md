@@ -80,6 +80,24 @@ The data generation step is executed via the `ilab data generate` command, and i
 
 The training step is run with the `ilab model train` command. This step trains the model on the synthetic data that was generated. The output of this step is a set of adapter files with the general format `adapters-xxx.npz`, where `xxx` is a number. These adapter files represent a snapshot of the model's trained state and are periodically written to disk.
 
+#### Out of Memory During LoRA Merge
+
+If you encounter out-of-memory (OOM) errors when merging LoRA adapters into the base model after training, you can use the streaming merge feature to reduce memory usage:
+
+```shell
+ilab model train --streaming
+```
+
+This processes the merge layer-by-layer instead of loading the entire model into memory, reducing peak memory from ~3x model size to approximately one layer at a time.
+
+You can also tune the chunk size (number of layers buffered at once) to balance memory usage and speed:
+
+```shell
+ilab model train --streaming --chunk-size 5
+```
+
+A smaller chunk size uses less memory but may be slower. The default chunk size is 10.
+
 #### Ways to train the model better
 
 1. Increase the number of training iterations via `--iters` flag. A larger number of iterations usually means a better trained model.

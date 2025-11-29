@@ -383,6 +383,19 @@ def clickpath_setup(is_dir: bool) -> click.Path:
     is_flag=True,
     help="Globally skips full-state (parameters, optimizer, etc.) saving per epoch. DISABLES TRAINING RESUMEABILITY.",
 )
+@click.option(
+    "--streaming",
+    is_flag=True,
+    default=False,
+    help="Use memory-efficient streaming merge for LoRA adapter fusion. Recommended for systems with limited RAM/VRAM.",
+)
+@click.option(
+    "--chunk-size",
+    type=int,
+    default=10,
+    show_default=True,
+    help="Number of layers to buffer during streaming merge. Lower values use less memory but may be slower.",
+)
 @click.pass_context
 @clickext.display_params
 def train(
@@ -421,6 +434,8 @@ def train(
     distributed_backend,
     optimize_memory,
     disable_accelerate_full_state_at_epoch: bool,
+    streaming: bool,
+    chunk_size: int,
     **kwargs,
 ):
     """
@@ -538,6 +553,8 @@ def train(
                 num_epochs=num_epochs,
                 device=device,
                 four_bit_quant=four_bit_quant,
+                streaming=streaming,
+                chunk_size=chunk_size,
             )
             click.echo(
                 "ᕦ(òᴗóˇ)ᕤ Simple Model training completed successfully! ᕦ(òᴗóˇ)ᕤ"
